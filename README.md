@@ -20,17 +20,6 @@ A React Native mobile joystick controller with haptic feedback designed specific
 - Expo CLI
 - Expo Go app (for testing on physical devices)
 
-### Installation
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/race-controller.git
-cd race-controller
-
-# Install dependencies
-yarn install
-```
-
 ### Running the app
 
 ```bash
