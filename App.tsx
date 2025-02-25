@@ -6,11 +6,7 @@ import { useConnectionStatus } from "./src/hooks/useConnectionStatus";
 import { colors } from "./src/styles/colors";
 
 export default function App() {
-  const { isConnected } = useConnectionStatus();
-
-  const handleDirectionChange = (directions: Direction[]) => {
-    // Handle multiple directions here
-  };
+  const { isConnected, gameCount } = useConnectionStatus();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -22,11 +18,15 @@ export default function App() {
           ]}
         />
         <Text style={styles.statusText}>
-          {isConnected ? "Connected to the game" : "Connecting..."}
+          {isConnected
+            ? gameCount > 0
+              ? `Connected to ${gameCount} game${gameCount !== 1 ? "s" : ""}`
+              : "Connected, waiting for game..."
+            : "Connecting..."}
         </Text>
       </View>
 
-      <Joystick onDirectionChange={handleDirectionChange} />
+      <Joystick />
     </SafeAreaView>
   );
 }

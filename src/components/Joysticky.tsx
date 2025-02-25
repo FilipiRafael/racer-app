@@ -1,19 +1,34 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-
 import * as Haptics from "expo-haptics";
+
 import { colors } from "../styles/colors";
 import { joystickConfig } from "../config/joystick";
+import websocketService from "../services/websocketService";
 
 export type Direction = "up" | "down" | "left" | "right" | null;
 
-interface JoystickProps {
-  onDirectionChange?: (directions: Direction[]) => void;
-}
-
-const Joystick: React.FC<JoystickProps> = ({ onDirectionChange }) => {
+const Joystick: React.FC = () => {
   const [activeButtons, setActiveButtons] = useState<Direction[]>([]);
   const lastHapticTimestamp = useRef<number>(0);
+  const updateInterval = useRef<NodeJS.Timeout | null>(null);
+  const lastTapTime = useRef<{ [key: string]: number }>({
+    up: 0,
+    down: 0,
+  });
+  const isMoving = useRef<"up" | "down" | null>(null);
+
+  useEffect(() => {
+    updateInterval.current = setInterval(() => {
+      websocketService.sendJoystickUpdate(activeButtons);
+    }, joystickConfig.response.updateFrequency);
+
+    return () => {
+      if (updateInterval.current) {
+        clearInterval(updateInterval.current);
+      }
+    };
+  }, [activeButtons]);
 
   const triggerHapticFeedback = () => {
     if (!joystickConfig.haptics.enabled) return;
@@ -48,26 +63,130 @@ const Joystick: React.FC<JoystickProps> = ({ onDirectionChange }) => {
     }
   };
 
-  const handlePressIn = (direction: Direction) => {
-    setActiveButtons((prev) => {
-      // Only add if not already present
-      if (!prev.includes(direction)) {
-        const newDirections = [...prev, direction];
-        onDirectionChange?.(newDirections);
+  const handleUpPress = () => {
+    const now = Date.now();
+    const isDoubleTap = now - lastTapTime.current.up < 300;
+    lastTapTime.current.up = now;
+
+    if (isMoving.current === null) {
+      // Car is stopped, start moving forward
+      isMoving.current = "up";
+      setActiveButtons((prev) => {
+        const newDirections: Direction[] = [
+          ...prev.filter((d) => d !== "up" && d !== "down"),
+          "up",
+        ];
+        websocketService.sendJoystickUpdate(newDirections);
         return newDirections;
+      });
+    } else if (isMoving.current === "down") {
+      // Car is moving backward
+      if (isDoubleTap) {
+        // Double-tap, switch to forward
+        isMoving.current = "up";
+        setActiveButtons((prev) => {
+          const newDirections: Direction[] = [
+            ...prev.filter((d) => d !== "up" && d !== "down"),
+            "up",
+          ];
+          websocketService.sendJoystickUpdate(newDirections);
+          return newDirections;
+        });
+      } else {
+        // Single tap, stop the car
+        isMoving.current = null;
+        setActiveButtons((prev) => {
+          const newDirections = prev.filter((d) => d !== "up" && d !== "down");
+          websocketService.sendJoystickUpdate(newDirections);
+          return newDirections;
+        });
       }
-      return prev;
-    });
+    } else if (isMoving.current === "up") {
+      // Car is already moving forward, stop it
+      isMoving.current = null;
+      setActiveButtons((prev) => {
+        const newDirections = prev.filter((d) => d !== "up" && d !== "down");
+        websocketService.sendJoystickUpdate(newDirections);
+        return newDirections;
+      });
+    }
 
     triggerHapticFeedback();
   };
 
+  const handleDownPress = () => {
+    const now = Date.now();
+    const isDoubleTap = now - lastTapTime.current.down < 300;
+    lastTapTime.current.down = now;
+
+    if (isMoving.current === null) {
+      // Car is stopped, start moving backward
+      isMoving.current = "down";
+      setActiveButtons((prev) => {
+        const newDirections: Direction[] = [
+          ...prev.filter((d) => d !== "up" && d !== "down"),
+          "down",
+        ];
+        websocketService.sendJoystickUpdate(newDirections);
+        return newDirections;
+      });
+    } else if (isMoving.current === "up") {
+      // Car is moving forward
+      if (isDoubleTap) {
+        // Double-tap, switch to backward
+        isMoving.current = "down";
+        setActiveButtons((prev) => {
+          const newDirections: Direction[] = [
+            ...prev.filter((d) => d !== "up" && d !== "down"),
+            "down",
+          ];
+          websocketService.sendJoystickUpdate(newDirections);
+          return newDirections;
+        });
+      } else {
+        // Single tap, stop the car
+        isMoving.current = null;
+        setActiveButtons((prev) => {
+          const newDirections = prev.filter((d) => d !== "up" && d !== "down");
+          websocketService.sendJoystickUpdate(newDirections);
+          return newDirections;
+        });
+      }
+    } else if (isMoving.current === "down") {
+      // Car is already moving backward, stop it
+      isMoving.current = null;
+      setActiveButtons((prev) => {
+        const newDirections = prev.filter((d) => d !== "up" && d !== "down");
+        websocketService.sendJoystickUpdate(newDirections);
+        return newDirections;
+      });
+    }
+
+    triggerHapticFeedback();
+  };
+
+  const handlePressIn = (direction: Direction) => {
+    if (direction === "left" || direction === "right") {
+      setActiveButtons((prev) => {
+        if (!prev.includes(direction)) {
+          const newDirections = [...prev, direction];
+          websocketService.sendJoystickUpdate(newDirections);
+          return newDirections;
+        }
+        return prev;
+      });
+      triggerHapticFeedback();
+    }
+  };
+
   const handlePressOut = (direction: Direction) => {
-    setActiveButtons((prev) => {
-      const newDirections = prev.filter((dir) => dir !== direction);
-      onDirectionChange?.(newDirections);
-      return newDirections;
-    });
+    if (direction === "left" || direction === "right") {
+      setActiveButtons((prev) => {
+        const newDirections = prev.filter((dir) => dir !== direction);
+        websocketService.sendJoystickUpdate(newDirections);
+        return newDirections;
+      });
+    }
   };
 
   const { visual } = joystickConfig;
@@ -96,10 +215,9 @@ const Joystick: React.FC<JoystickProps> = ({ onDirectionChange }) => {
               borderRadius: visual.buttonBorderRadius,
               transform: [{ translateY: -offset }],
             },
-            activeButtons.includes("up") && styles.activeButton,
+            isMoving.current === "up" && styles.activeButton,
           ]}
-          onPressIn={() => handlePressIn("up")}
-          onPressOut={() => handlePressOut("up")}
+          onPress={handleUpPress}
           activeOpacity={joystickConfig.response.buttonActiveOpacity}
         >
           <Text style={styles.buttonText}>▲</Text>
@@ -114,10 +232,9 @@ const Joystick: React.FC<JoystickProps> = ({ onDirectionChange }) => {
               borderRadius: visual.buttonBorderRadius,
               transform: [{ translateY: offset }],
             },
-            activeButtons.includes("down") && styles.activeButton,
+            isMoving.current === "down" && styles.activeButton,
           ]}
-          onPressIn={() => handlePressIn("down")}
-          onPressOut={() => handlePressOut("down")}
+          onPress={handleDownPress}
           activeOpacity={joystickConfig.response.buttonActiveOpacity}
         >
           <Text style={styles.buttonText}>▼</Text>

@@ -1,21 +1,17 @@
 export const joystickConfig = {
-  haptics: {
-    enabled: true,
-    feedbackType: "impactMedium",
-    cooldown: 100,
-    continuous: {
-      enabled: true,
-      interval: 500,
-      intensity: "light",
-    },
-  },
   visual: {
-    centerCircleSize: 250,
+    centerCircleSize: 120,
     buttonSize: 100,
-    buttonOffset: 65,
-    buttonBorderRadius: 10,
+    buttonOffset: 80,
+    buttonBorderRadius: 20,
   },
   response: {
-    buttonActiveOpacity: 0.8,
+    buttonActiveOpacity: 0.7,
+    updateFrequency: 100,
+  },
+  haptics: {
+    enabled: true,
+    cooldown: 50,
+    feedbackType: "impactLight",
   },
 };
